@@ -24,42 +24,21 @@ namespace BunnyNetChallenge.Controllers
 
         [HttpPost]
         [SwaggerOperation(Summary ="Create and start container by image name.")]
-        public async Task<IActionResult> Post(CreateContainerRequest request, CancellationToken cancellationToken)
+        public IActionResult Post(CreateContainerRequest request)
         {
-            await _createContainersChannel.Writer.WriteAsync(request, cancellationToken);
+            Console.WriteLine("Thread {0} is in controller", Thread.CurrentThread.ManagedThreadId);
+            _createContainersChannel.Writer.TryWrite(request);
 
             return Ok();
-            ////pull image if not pulled yet
-            //await _dockerClient.Images.CreateImageAsync(
-            //    new ImagesCreateParameters
-            //    {
-            //        FromImage = request.ImageName,
-            //        Tag = string.IsNullOrEmpty(request.Tag) ? "latest" : request.Tag,
-            //    },
-            //    null,
-            //    new Progress<JSONMessage>(x => _logger.LogDebug(x.ProgressMessage)));
-
-            ////create container using pulled image
-            //var response = await _dockerClient.Containers.CreateContainerAsync(new CreateContainerParameters()
-            //{
-            //    Image = request.ImageName       
-            //});
-
-            ////start created container
-            //await _dockerClient.Containers.StartContainerAsync(
-            //    response.ID,
-            //    new ContainerStartParameters()
-            //    );
         }
 
         [HttpDelete]
         [SwaggerOperation(Summary = "Stop container by container ID.")]
-        public async Task<IActionResult> Delete(StopContainerRequest request, CancellationToken cancellationToken)
+        public IActionResult Delete(StopContainerRequest request)
         {
-            await _stopContainersChannel.Writer.WriteAsync(request, cancellationToken);
+            _stopContainersChannel.Writer.TryWrite(request);
 
             return NoContent();
-         //   await _dockerClient.Containers.StopContainerAsync(containerId, new ContainerStopParameters(), CancellationToken.None);
         }
 
         [HttpGet(Name = "GetContainersInfo")]
@@ -88,24 +67,4 @@ namespace BunnyNetChallenge.Controllers
             return resultList.GetRange(startIndex, endIndex - startIndex);
         }
     }
-}
-public class CreateContainerRequest
-{
-    [Required]
-    public string ImageName { get; set; }
-
-    public string Tag { get; set; }
-}
-public class StopContainerRequest
-{
-    [Required]
-    public string ContainerID { get; set; }
-}
-
-public class ContainerStatusInfo
-{
-    public string ID { get; set; }
-    public string ImageName { get; set; }
-    public string State { get; set; }
-    public DateTime Created { get; set; }
 }

@@ -1,4 +1,5 @@
 using BunnyNetChallenge;
+using BunnyNetChallenge.RequestProcessors;
 using Docker.DotNet;
 using System.Threading.Channels;
 
@@ -21,6 +22,8 @@ var createContainersChannel = Channel.CreateUnbounded<CreateContainerRequest>();
 builder.Services.AddSingleton(createContainersChannel);
 var stopContainersChannel = Channel.CreateUnbounded<StopContainerRequest>();
 builder.Services.AddSingleton(stopContainersChannel);
+builder.Services.AddTransient<IRequestProcessor<CreateContainerRequest>,  CreateContainerRequestProcessor>();
+builder.Services.AddTransient<IRequestProcessor<StopContainerRequest>, StopContainerRequestProcessor>();
 
 var app = builder.Build();
 
@@ -36,8 +39,10 @@ app.UseAuthorization();
 app.MapControllers();
 
 // Start worker threads to process requests
-//Task.Run(() => ProcessRequests(createContainersChannel.));
-//Task.Run(() => ProcessRequests(stopContainersChannel));
+var createContainersProcessor = app.Services.GetRequiredService<IRequestProcessor<CreateContainerRequest>>();
+var createTask = Task.Run(()=>createContainersProcessor.StartProcessingAsync());
+var stopContainersProcessor = app.Services.GetRequiredService<IRequestProcessor<StopContainerRequest>>();
+var stopTask = Task.Run(() => stopContainersProcessor.StartProcessingAsync());
 
 app.Run();
 
