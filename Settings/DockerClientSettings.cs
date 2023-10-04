@@ -1,6 +1,6 @@
 ﻿using System.Diagnostics.CodeAnalysis;
 
-namespace BunnyNetChallenge
+namespace BunnyNetChallenge.Settings
 {
     public class DockerClientSettings
     {

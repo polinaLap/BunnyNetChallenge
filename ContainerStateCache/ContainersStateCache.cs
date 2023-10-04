@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
+using BunnyNetChallenge.Models;
 
-namespace BunnyNetChallenge
+namespace BunnyNetChallenge.ContainerStateCache
 {
     public class ContainersStateCache : IContainersStateCache
     {
@@ -11,14 +12,14 @@ namespace BunnyNetChallenge
             _containerStates = new ConcurrentDictionary<string, ContainerStateModel>();
         }
 
-        public void Add(ContainerStateModel containerState)
+        public void AddOrUpdate(ContainerStateModel containerState)
         {
-            _containerStates[containerState.ContainerId] = containerState;
+            _containerStates[containerState.ContainerName] = containerState;
         }
 
-        public ContainerStateModel Get(string id)
+        public ContainerStateModel Get(string containerName)
         {
-            _containerStates.TryGetValue(id, out var containerState);
+            _containerStates.TryGetValue(containerName, out var containerState);
             return containerState;
         }
 

@@ -1,45 +1,102 @@
-﻿using Docker.DotNet;
+﻿using BunnyNetChallenge.ContainerStateCache;
+using BunnyNetChallenge.Models;
+using Docker.DotNet;
 using Docker.DotNet.Models;
 using System.Threading.Channels;
+using ContainerState = BunnyNetChallenge.Models.ContainerState;
 
 namespace BunnyNetChallenge.RequestProcessors
 {
     public class CreateContainerRequestProcessor : BaseRequestProcessor<CreateContainerRequest>
     {
-
         private readonly IDockerClient _dockerClient;
-        private readonly ILogger<CreateContainerRequestProcessor> _logger;
-        public CreateContainerRequestProcessor(Channel<CreateContainerRequest> requestChannel, IDockerClient dockerClient, ILogger<CreateContainerRequestProcessor> logger) : base(requestChannel)
+        private readonly IContainersStateCache _containersStateCache;
+
+        public CreateContainerRequestProcessor(
+            Channel<CreateContainerRequest> requestChannel, 
+            IDockerClient dockerClient,
+            IContainersStateCache containersStateCache,
+            ILogger<CreateContainerRequestProcessor> logger) : base(requestChannel, logger)
         {
             _dockerClient = dockerClient;
-            _logger = logger;
+            _containersStateCache = containersStateCache;
         }
 
         protected override async Task ProcessRequestAsync(CreateContainerRequest request)
         {
-            //pull image if not pulled yet
-            Console.WriteLine("Thread {0} is in processor", Thread.CurrentThread.ManagedThreadId);
-            await _dockerClient.Images.CreateImageAsync(
-                new ImagesCreateParameters
-                {
-                    FromImage = request.ImageName,
-                    Tag = string.IsNullOrEmpty(request.Tag) ? "latest" : request.Tag,
-                },
-                null,
-                new Progress<JSONMessage>(m => _logger.LogDebug(m.Status)));
-
-            //create container using pulled image
-            var response = await _dockerClient.Containers.CreateContainerAsync(new CreateContainerParameters()
+            var containerState = new ContainerStateModel()
             {
-                Image = request.ImageName
-            });
+                ContainerName = request.ContainerName
+            };
+            await PullImageAsync(request, containerState);
+            await CreateContainerAsync(request, containerState);
+            await StartContainerAsync(containerState);
 
-            //start created container
-            await _dockerClient.Containers.StartContainerAsync(
-                response.ID,
-                new ContainerStartParameters());
+            _logger.LogDebug("Container {containerName} by image {image} has started", request.ContainerName, request.ImageName);
+        }
 
-            _logger.LogDebug("Container {containerId} by image {image} has started", response.ID, request.ImageName);
+        private async Task PullImageAsync(CreateContainerRequest request, ContainerStateModel containerState)
+        {
+            try
+            {
+                await _dockerClient.Images.CreateImageAsync(
+                    new ImagesCreateParameters
+                    {
+                        FromImage = request.ImageName,
+                        Tag = string.IsNullOrEmpty(request.ImageTag) ? "latest" : request.ImageTag,
+                    },
+                    authConfig: null,
+                    new Progress<JSONMessage>(m => _logger.LogDebug(m.Status)));
+
+                containerState.State = ContainerState.ImagePulled;
+                _containersStateCache.AddOrUpdate(containerState);
+            }
+            catch
+            {
+                containerState.State = ContainerState.ImagePullingError;
+                _containersStateCache.AddOrUpdate(containerState);
+                throw;
+            }
+        }
+
+        private async Task CreateContainerAsync(CreateContainerRequest request, ContainerStateModel containerState)
+        {
+            try
+            {
+                var response = await _dockerClient.Containers.CreateContainerAsync(new CreateContainerParameters()
+                {
+                    Image = request.ImageName,
+                    Name = request.ContainerName
+                });
+                containerState.ContainerId = response.ID;
+                containerState.State = ContainerState.Created;
+                _containersStateCache.AddOrUpdate(containerState);
+            }
+            catch
+            {
+                containerState.State = ContainerState.ContainerCreationError;
+                _containersStateCache.AddOrUpdate(containerState);
+                throw; 
+            }
+        }
+
+        private async Task StartContainerAsync(ContainerStateModel containerState)
+        {
+            try
+            {
+                var isStarted = await _dockerClient.Containers.StartContainerAsync(
+                    containerState.ContainerId,
+                    new ContainerStartParameters());
+
+                containerState.State = isStarted ? ContainerState.Running : ContainerState.ContainerStartingError;
+                _containersStateCache.AddOrUpdate(containerState);
+            }
+            catch
+            {
+                containerState.State = ContainerState.ContainerStartingError;
+                _containersStateCache.AddOrUpdate(containerState);
+                throw;
+            }
         }
     }
 }
