@@ -11,9 +11,9 @@ namespace BunnyNetChallenge.RequestProcessors
             _requestChannel = requestChannel;
         }
 
-        public async Task StartProcessingAsync()
+        public async Task StartProcessingAsync(CancellationToken cancellationToken)
         {
-            while (await _requestChannel.Reader.WaitToReadAsync())
+            while (await _requestChannel.Reader.WaitToReadAsync(cancellationToken))
             {
                 while (_requestChannel.Reader.TryRead(out var request))
                 {

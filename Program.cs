@@ -1,4 +1,5 @@
 using BunnyNetChallenge;
+using BunnyNetChallenge.ObsoleteContainersMonitoring;
 using BunnyNetChallenge.RequestProcessors;
 using Docker.DotNet;
 using System.Threading.Channels;
@@ -25,6 +26,12 @@ builder.Services.AddSingleton(stopContainersChannel);
 builder.Services.AddTransient<IRequestProcessor<CreateContainerRequest>,  CreateContainerRequestProcessor>();
 builder.Services.AddTransient<IRequestProcessor<StopContainerRequest>, StopContainerRequestProcessor>();
 
+builder.Services.AddSingleton<IContainersStateCache, ContainersStateCache>();
+
+//Obsolete - I've done it before Zvone's response :)
+//add docker events processing
+//builder.Services.AddSingleton<IContainersMonitoringService, ContainersMonitoringService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -38,11 +45,20 @@ app.UseAuthorization();
 
 app.MapControllers();
 
+var cancellationTokenSource = new CancellationTokenSource();
+var cancellationToken = cancellationTokenSource.Token;
+
+//var dockerEventProcessor = app.Services.GetRequiredService<IContainersMonitoringService>();
+//var eventsMonitoringTask = Task.Run(() => dockerEventProcessor.StartMonitoringAsync(cancellationToken));
+
 // Start worker threads to process requests
 var createContainersProcessor = app.Services.GetRequiredService<IRequestProcessor<CreateContainerRequest>>();
-var createTask = Task.Run(()=>createContainersProcessor.StartProcessingAsync());
+var createTask = Task.Run(()=>createContainersProcessor.StartProcessingAsync(cancellationToken));
 var stopContainersProcessor = app.Services.GetRequiredService<IRequestProcessor<StopContainerRequest>>();
-var stopTask = Task.Run(() => stopContainersProcessor.StartProcessingAsync());
+var stopTask = Task.Run(() => stopContainersProcessor.StartProcessingAsync(cancellationToken));
+
+// Shutdown gracefully on application stop
+app.Lifetime.ApplicationStopped.Register(() => cancellationTokenSource.Cancel());
 
 app.Run();
 

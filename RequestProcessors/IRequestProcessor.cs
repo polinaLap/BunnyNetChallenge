@@ -2,6 +2,6 @@
 {
     public interface IRequestProcessor<T>
     {
-        Task StartProcessingAsync();
+        Task StartProcessingAsync(CancellationToken cancellationToken);
     }
 }

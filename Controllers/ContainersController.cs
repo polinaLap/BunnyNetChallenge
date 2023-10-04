@@ -1,5 +1,3 @@
-using Docker.DotNet;
-using Docker.DotNet.Models;
 using Microsoft.AspNetCore.Mvc;
 using Swashbuckle.AspNetCore.Annotations;
 using System.ComponentModel.DataAnnotations;
@@ -13,13 +11,16 @@ namespace BunnyNetChallenge.Controllers
     {
         private readonly Channel<CreateContainerRequest> _createContainersChannel;
         private readonly Channel<StopContainerRequest> _stopContainersChannel;
-        private readonly IDockerClient _dockerClient;
+        private readonly IContainersStateCache _containersStateCache;
 
-        public ContainersController(IDockerClient dockerClient, Channel<CreateContainerRequest> createContainersChannel, Channel<StopContainerRequest> stopContainersChannel)
+        public ContainersController(
+            Channel<CreateContainerRequest> createContainersChannel, 
+            Channel<StopContainerRequest> stopContainersChannel, 
+            IContainersStateCache containersStateCache)
         {
-            _dockerClient = dockerClient;
             _createContainersChannel = createContainersChannel;
             _stopContainersChannel = stopContainersChannel;
+            _containersStateCache = containersStateCache;
         }
 
         [HttpPost]
@@ -41,30 +42,19 @@ namespace BunnyNetChallenge.Controllers
             return NoContent();
         }
 
-        [HttpGet(Name = "GetContainersInfo")]
-        [SwaggerOperation(Summary = "Get a list of containers statuses.")]
-        public async Task<IEnumerable<ContainerStatusInfo>> GetList([Range(0, 100)]int limit = 10, [Range(0,100)] int page = 1)
+        [HttpGet]
+        [SwaggerOperation(Summary = "Get a containers status by id.")]
+        public ContainerStateModel Get(string id)
         {
-            var containers = await _dockerClient.Containers.ListContainersAsync(new ContainersListParameters()
-            {
-                All = true
-            });
+            return _containersStateCache.Get(id);
+        }
 
-            var resultList = containers.Select(x => new ContainerStatusInfo
-            {
-                ID = x.ID,
-                ImageName = x.Image,
-                State = x.State,
-                Created = x.Created
-            })
-                .OrderBy(x => x.Created).ToList();
-
-            var startIndex = (page - 1) * limit;
-            if (startIndex >= resultList.Count)
-                return new List<ContainerStatusInfo>();
-
-            var endIndex = Math.Min(startIndex + limit, resultList.Count);
-            return resultList.GetRange(startIndex, endIndex - startIndex);
+        [HttpGet]
+        [Route("/list")]
+        [SwaggerOperation(Summary = "Get a list of containers statuses.")]
+        public IEnumerable<ContainerStateModel> GetList([Range(0, 100)]int pageSize = 10, [Range(0,100)] int page = 1)
+        {
+            return _containersStateCache.GetPaginatedList(pageSize, page);
         }
     }
 }

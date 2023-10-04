@@ -18,7 +18,6 @@ namespace BunnyNetChallenge.RequestProcessors
         protected override async Task ProcessRequestAsync(CreateContainerRequest request)
         {
             //pull image if not pulled yet
-
             Console.WriteLine("Thread {0} is in processor", Thread.CurrentThread.ManagedThreadId);
             await _dockerClient.Images.CreateImageAsync(
                 new ImagesCreateParameters
