@@ -15,23 +15,13 @@ namespace BunnyNetChallenge.RequestProcessors
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation(
-                $"Queued Hosted Service is running.{Environment.NewLine}" +
-                $"{Environment.NewLine}Tap W to add a work item to the " +
-                $"background queue.{Environment.NewLine}");
-
-            await BackgroundProcessing(stoppingToken);
-        }
-
-        private async Task BackgroundProcessing(CancellationToken stoppingToken)
-        {
             while (await _requestChannel.Reader.WaitToReadAsync(stoppingToken))
             {
                 while (_requestChannel.Reader.TryRead(out var request))
                 {
                     try
                     {
-                        await ProcessRequestAsync(request);
+                        await ProcessRequestAsync(request, stoppingToken);
                     }
                     catch (Exception ex)
                     {
@@ -44,6 +34,6 @@ namespace BunnyNetChallenge.RequestProcessors
             }
         }
 
-        protected abstract Task ProcessRequestAsync(T request);
+        protected abstract Task ProcessRequestAsync(T request, CancellationToken stoppingToken);
     }
 }

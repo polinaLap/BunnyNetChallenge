@@ -22,31 +22,30 @@ namespace BunnyNetChallenge.RequestProcessors
             _containersStateCache = containersStateCache;
         }
 
-        protected override async Task ProcessRequestAsync(CreateContainerRequest request)
+        protected override async Task ProcessRequestAsync(CreateContainerRequest request, CancellationToken stoppingToken)
         {
-            var containerState = new ContainerStateModel()
-            {
-                ContainerName = request.ContainerName
-            };
-            await PullImageAsync(request, containerState);
-            await CreateContainerAsync(request, containerState);
-            await StartContainerAsync(containerState);
+            var containerState = new ContainerStateModel { ContainerName = request.ContainerName };
+            await PullImageAsync(request, containerState, stoppingToken);
+            await CreateContainerAsync(request, containerState, stoppingToken);
+            await StartContainerAsync(containerState, stoppingToken);
 
-            _logger.LogDebug("Container {containerName} by image {image} has started", request.ContainerName, request.ImageName);
+            _logger.LogDebug("Container {0} by image {1} has started", request.ContainerName, request.ImageName);
         }
 
-        private async Task PullImageAsync(CreateContainerRequest request, ContainerStateModel containerState)
+        private async Task PullImageAsync(CreateContainerRequest request, ContainerStateModel containerState, CancellationToken stoppingToken)
         {
             try
             {
+                var paremeters = new ImagesCreateParameters
+                {
+                    FromImage = request.ImageName,
+                    Tag = string.IsNullOrEmpty(request.ImageTag) ? "latest" : request.ImageTag,
+                };
                 await _dockerClient.Images.CreateImageAsync(
-                    new ImagesCreateParameters
-                    {
-                        FromImage = request.ImageName,
-                        Tag = string.IsNullOrEmpty(request.ImageTag) ? "latest" : request.ImageTag,
-                    },
+                    paremeters,
                     authConfig: null,
-                    new Progress<JSONMessage>(m => _logger.LogDebug(m.Status)));
+                    new Progress<JSONMessage>(m => _logger.LogDebug(m.Status)),
+                    stoppingToken);
 
                 containerState.State = ContainerState.ImagePulled;
                 _containersStateCache.AddOrUpdate(containerState);
@@ -59,15 +58,17 @@ namespace BunnyNetChallenge.RequestProcessors
             }
         }
 
-        private async Task CreateContainerAsync(CreateContainerRequest request, ContainerStateModel containerState)
+        private async Task CreateContainerAsync(CreateContainerRequest request, ContainerStateModel containerState, CancellationToken stoppingToken)
         {
             try
             {
-                var response = await _dockerClient.Containers.CreateContainerAsync(new CreateContainerParameters()
+                var parameters = new CreateContainerParameters()
                 {
                     Image = request.ImageName,
                     Name = request.ContainerName
-                });
+                };
+                var response = await _dockerClient.Containers.CreateContainerAsync(parameters, stoppingToken);
+
                 containerState.ContainerId = response.ID;
                 containerState.State = ContainerState.Created;
                 _containersStateCache.AddOrUpdate(containerState);
@@ -76,17 +77,18 @@ namespace BunnyNetChallenge.RequestProcessors
             {
                 containerState.State = ContainerState.ContainerCreationError;
                 _containersStateCache.AddOrUpdate(containerState);
-                throw; 
+                throw;
             }
         }
 
-        private async Task StartContainerAsync(ContainerStateModel containerState)
+        private async Task StartContainerAsync(ContainerStateModel containerState, CancellationToken stoppingToken)
         {
             try
             {
                 var isStarted = await _dockerClient.Containers.StartContainerAsync(
                     containerState.ContainerId,
-                    new ContainerStartParameters());
+                    new ContainerStartParameters(),
+                    stoppingToken);
 
                 containerState.State = isStarted ? ContainerState.Running : ContainerState.ContainerStartingError;
                 _containersStateCache.AddOrUpdate(containerState);

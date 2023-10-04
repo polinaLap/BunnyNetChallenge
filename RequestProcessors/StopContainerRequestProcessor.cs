@@ -1,5 +1,4 @@
 ﻿using BunnyNetChallenge.ContainerStateCache;
-using BunnyNetChallenge.Models;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using System.Threading.Channels;
@@ -23,7 +22,7 @@ namespace BunnyNetChallenge.RequestProcessors
             _containersStateCache = containersStateCache;  
         }
 
-        protected override async Task ProcessRequestAsync(StopContainerRequest request)
+        protected override async Task ProcessRequestAsync(StopContainerRequest request, CancellationToken stoppingToken)
         {
             var containerState = _containersStateCache.Get(request.ContainerName);
             if (containerState == null)
@@ -32,11 +31,14 @@ namespace BunnyNetChallenge.RequestProcessors
             }
             try
             {               
-                await _dockerClient.Containers.StopContainerAsync(request.ContainerName, new ContainerStopParameters(), CancellationToken.None);
+                await _dockerClient.Containers.StopContainerAsync(
+                    request.ContainerName, 
+                    new ContainerStopParameters(), 
+                    stoppingToken);
                 containerState.State = ContainerState.Exited;
                 _containersStateCache.AddOrUpdate(containerState);
 
-                _logger.LogDebug("Container {containerName} by image {image} has stopped", request.ContainerName);
+                _logger.LogDebug("Container {0} by image {1} has stopped", request.ContainerName);
             }
             catch
             {
