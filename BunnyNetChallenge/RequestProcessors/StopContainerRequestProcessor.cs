@@ -1,5 +1,4 @@
 ﻿using BunnyNetChallenge.ContainerStateCache;
-using BunnyNetChallenge.Models;
 using Docker.DotNet;
 using Docker.DotNet.Models;
 using System.Threading.Channels;

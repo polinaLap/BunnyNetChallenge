@@ -12,6 +12,8 @@ namespace BunnyNetChallenge.ContainerStateCache
             _containerStates = new ConcurrentDictionary<string, ContainerStateModel>();
         }
 
+        public int Count => _containerStates.Count;
+
         public void AddOrUpdate(ContainerStateModel containerState)
         {
             _containerStates[containerState.Name] = containerState;

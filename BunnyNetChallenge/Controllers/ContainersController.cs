@@ -78,7 +78,7 @@ namespace BunnyNetChallenge.Controllers
         [HttpGet]
         [Route("/list")]
         [SwaggerOperation(Summary = "Get a list of containers statuses.")]
-        public async Task<IEnumerable<ContainerStateModel>> GetList([Range(0, 100)]int pageSize = 10, [Range(0,100)] int page = 1)
+        public async Task<PaginatedListResponse> GetList([Range(0, 100)]int pageSize = 10, [Range(0,100)] int page = 1)
         {
             //no pagination on Docker API side, so retrieve all
             var containers = await _dockerClient.Containers.ListContainersAsync(
@@ -92,7 +92,11 @@ namespace BunnyNetChallenge.Controllers
                 UpdateCachedContainer(container);
             }
 
-            return _containersStateCache.GetPaginatedList(pageSize, page);
+            return new PaginatedListResponse 
+            { 
+                Containers = _containersStateCache.GetPaginatedList(pageSize, page),
+                TotalCount = _containersStateCache.Count 
+            };
         }
 
         private void UpdateCachedContainer(ContainerListResponse container)
