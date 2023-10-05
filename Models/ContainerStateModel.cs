@@ -6,7 +6,7 @@ namespace BunnyNetChallenge.Models
     {
         public string Name { get; set; }
 
-        public string Id { get; set; }
+        public string ContainerId { get; set; }
 
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public ContainerState State { get; set; }

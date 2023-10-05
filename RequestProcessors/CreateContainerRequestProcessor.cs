@@ -69,7 +69,7 @@ namespace BunnyNetChallenge.RequestProcessors
                 };
                 var response = await _dockerClient.Containers.CreateContainerAsync(parameters, stoppingToken);
 
-                containerState.Id = response.ID;
+                containerState.ContainerId = response.ID;
                 containerState.State = ContainerState.Created;
                 _containersStateCache.AddOrUpdate(containerState);
 
@@ -85,7 +85,7 @@ namespace BunnyNetChallenge.RequestProcessors
 
         private async Task StartContainerAsync(string containerId, CreateContainerRequest request, CancellationToken stoppingToken)
         {
-            var containerState = new ContainerStateModel { Name = request.ContainerName, Id = containerId };
+            var containerState = new ContainerStateModel { Name = request.ContainerName, ContainerId = containerId };
             try
             {
                 var isStarted = await _dockerClient.Containers.StartContainerAsync(

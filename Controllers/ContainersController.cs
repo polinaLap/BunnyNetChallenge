@@ -35,7 +35,7 @@ namespace BunnyNetChallenge.Controllers
         [SwaggerOperation(Summary ="Create and start container by image name.")]
         [ProducesResponseType(StatusCodes.Status200OK)]
         [ProducesResponseType(StatusCodes.Status400BadRequest)]
-        public IActionResult Start(CreateContainerRequest request)
+        public async Task<IActionResult> Start(CreateContainerRequest request)
         {
             var container = _containersStateCache.Get(request.ContainerName);
             if (container != null)
@@ -43,7 +43,12 @@ namespace BunnyNetChallenge.Controllers
                 return BadRequest("Container with this name already exists.");
             }
 
-            _createContainersChannel.Writer.TryWrite(request);
+            await _createContainersChannel.Writer.WriteAsync(request);
+            _containersStateCache.AddOrUpdate(new ContainerStateModel
+            {
+                Name = request.ContainerName,
+                State = ContainerState.QueuedToStart
+            });
 
             return Ok();
         }
@@ -52,7 +57,7 @@ namespace BunnyNetChallenge.Controllers
         [SwaggerOperation(Summary = "Stop container by container name.")]
         [ProducesResponseType(StatusCodes.Status204NoContent)]
         [ProducesResponseType(StatusCodes.Status404NotFound)]
-        public IActionResult Stop(StopContainerRequest request)
+        public async Task<IActionResult> Stop(StopContainerRequest request)
         {
             var container = _containersStateCache.Get(request.ContainerName);
             if (container == null)
@@ -60,7 +65,12 @@ namespace BunnyNetChallenge.Controllers
                 return NotFound();
             }
 
-            _stopContainersChannel.Writer.TryWrite(request);
+            await _stopContainersChannel.Writer.WriteAsync(request);
+            _containersStateCache.AddOrUpdate(new ContainerStateModel
+            {
+                Name = request.ContainerName,
+                State = ContainerState.QueuedToStop
+            });
 
             return NoContent();
         }
@@ -95,7 +105,7 @@ namespace BunnyNetChallenge.Controllers
                 var cachedContainer = _containersStateCache.Get(name);
                 var updatedContainer = cachedContainer ?? new ContainerStateModel
                 {
-                    Id = container.ID,
+                    ContainerId = container.ID,
                     Name = name,
                 };
                 updatedContainer.State = (ContainerState)state;
