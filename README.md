@@ -27,3 +27,28 @@ Default for Unix: "unix:///var/run/docker.sock"
 ``````
 - run solution with `dotnet run` or IDE
 - open `http://localhost:5183/swagger/index.html` to access Swagger
+
+## Solution description
+3 API methods are available: 
+1) Start the container by image name, tag, also provide a unique name for the container
+2) Stop container by container name 
+They both work using `System.Threading.Channels` - request is queued to the channel in the controller, then dequeued and processed in `BackgroundService`-s.
+During the process the current state of job is stored in `ConcurrentDictionary`wrapped in the class `ContainersStateCache`.
+Possible states of container: 
+````
+QueuedToStart,
+QueuedToStop,
+ImagePulled,
+ImagePullingError,
+ContainerCreationError,
+ContainerStartingError,
+ContainerStoppingError,
+Created,
+Running,
+Restarting,
+Paused,
+Exited,
+Dead
+````
+3) Get paginated list of containers
+Here the shared dictionary is updated with info from DockerAPI (so we can get Restarting, Paused, Dead states) and a list of containers and their total count are returned.
