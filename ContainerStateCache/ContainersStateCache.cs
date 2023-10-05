@@ -14,19 +14,19 @@ namespace BunnyNetChallenge.ContainerStateCache
 
         public void AddOrUpdate(ContainerStateModel containerState)
         {
-            _containerStates[containerState.ContainerName] = containerState;
+            _containerStates[containerState.Name] = containerState;
         }
 
-        public ContainerStateModel Get(string containerName)
+        public ContainerStateModel? Get(string containerName)
         {
-            _containerStates.TryGetValue(containerName, out var containerState);
-            return containerState;
+            var exists = _containerStates.TryGetValue(containerName, out ContainerStateModel containerState);
+            return exists ? containerState : null;
         }
 
         public IEnumerable<ContainerStateModel> GetPaginatedList(int pageSize, int page)
         {
             var startIndex = (page - 1) * pageSize;
-            return _containerStates.Values.Skip(startIndex).Take(pageSize);
+            return _containerStates.Values.OrderBy(x => x.Name).Skip(startIndex).Take(pageSize);
         }
     }
 }

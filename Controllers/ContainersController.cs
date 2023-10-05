@@ -93,14 +93,14 @@ namespace BunnyNetChallenge.Controllers
             {
                 var name = container.Names.First().Replace("/", string.Empty);
                 var cachedContainer = _containersStateCache.Get(name);
-                cachedContainer ??= new ContainerStateModel
+                var updatedContainer = cachedContainer ?? new ContainerStateModel
                 {
-                    ContainerId = container.ID,
-                    ContainerName = name,
+                    Id = container.ID,
+                    Name = name,
                 };
-                cachedContainer.State = (ContainerState)state;
+                updatedContainer.State = (ContainerState)state;
 
-                _containersStateCache.AddOrUpdate(cachedContainer);
+                _containersStateCache.AddOrUpdate(updatedContainer);
             }
         }
     }

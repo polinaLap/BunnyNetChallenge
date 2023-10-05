@@ -2,11 +2,11 @@
 
 namespace BunnyNetChallenge.Models
 {
-    public class ContainerStateModel
+    public struct ContainerStateModel
     {
-        public string ContainerName { get; set; }
+        public string Name { get; set; }
 
-        public string ContainerId { get; set; }
+        public string Id { get; set; }
 
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public ContainerState State { get; set; }

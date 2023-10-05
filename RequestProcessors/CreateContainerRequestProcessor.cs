@@ -24,16 +24,16 @@ namespace BunnyNetChallenge.RequestProcessors
 
         protected override async Task ProcessRequestAsync(CreateContainerRequest request, CancellationToken stoppingToken)
         {
-            var containerState = new ContainerStateModel { ContainerName = request.ContainerName };
-            await PullImageAsync(request, containerState, stoppingToken);
-            await CreateContainerAsync(request, containerState, stoppingToken);
-            await StartContainerAsync(containerState, stoppingToken);
+            await PullImageAsync(request, stoppingToken);
+            var containerId = await CreateContainerAsync(request, stoppingToken);
+            await StartContainerAsync(containerId, request, stoppingToken);
 
             _logger.LogDebug("Container {0} by image {1} has started", request.ContainerName, request.ImageName);
         }
 
-        private async Task PullImageAsync(CreateContainerRequest request, ContainerStateModel containerState, CancellationToken stoppingToken)
+        private async Task PullImageAsync(CreateContainerRequest request, CancellationToken stoppingToken)
         {
+            var containerState = new ContainerStateModel { Name = request.ContainerName };
             try
             {
                 var paremeters = new ImagesCreateParameters
@@ -45,8 +45,7 @@ namespace BunnyNetChallenge.RequestProcessors
                     paremeters,
                     authConfig: null,
                     new Progress<JSONMessage>(m => _logger.LogDebug(m.Status)),
-                    stoppingToken);
-
+                    stoppingToken);                
                 containerState.State = ContainerState.ImagePulled;
                 _containersStateCache.AddOrUpdate(containerState);
             }
@@ -58,8 +57,9 @@ namespace BunnyNetChallenge.RequestProcessors
             }
         }
 
-        private async Task CreateContainerAsync(CreateContainerRequest request, ContainerStateModel containerState, CancellationToken stoppingToken)
+        private async Task<string> CreateContainerAsync(CreateContainerRequest request, CancellationToken stoppingToken)
         {
+            var containerState = new ContainerStateModel { Name = request.ContainerName };
             try
             {
                 var parameters = new CreateContainerParameters()
@@ -69,9 +69,11 @@ namespace BunnyNetChallenge.RequestProcessors
                 };
                 var response = await _dockerClient.Containers.CreateContainerAsync(parameters, stoppingToken);
 
-                containerState.ContainerId = response.ID;
+                containerState.Id = response.ID;
                 containerState.State = ContainerState.Created;
                 _containersStateCache.AddOrUpdate(containerState);
+
+                return response.ID;
             }
             catch
             {
@@ -81,12 +83,13 @@ namespace BunnyNetChallenge.RequestProcessors
             }
         }
 
-        private async Task StartContainerAsync(ContainerStateModel containerState, CancellationToken stoppingToken)
+        private async Task StartContainerAsync(string containerId, CreateContainerRequest request, CancellationToken stoppingToken)
         {
+            var containerState = new ContainerStateModel { Name = request.ContainerName, Id = containerId };
             try
             {
                 var isStarted = await _dockerClient.Containers.StartContainerAsync(
-                    containerState.ContainerId,
+                    containerId,
                     new ContainerStartParameters(),
                     stoppingToken);
 
